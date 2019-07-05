@@ -28,11 +28,15 @@ Test results along with HTML test report will be generated
 =========================== test session starts ===============================
 
 platform win32 -- Python 3.7.3, pytest-5.0.0, py-1.8.0, pluggy-0.12.0 -- c:\users\abc\downloads\reflektion\venv\scripts\python.exe
+
 cachedir: .pytest_cache
-metadata: {'Python': '3.7.3', 'Platform': 'Windows-8.1-6.3.9600-SP0', 'Packages': {'pytest': '5.0.0', 'py': '1.8.0', 'pluggy': '0.12.0'}, 'Plugins': {'html': '1.21.1', 'metadata': '1.8.
-0'}}
+
+metadata: {'Python': '3.7.3', 'Platform': 'Windows-8.1-6.3.9600-SP0', 'Packages': {'pytest': '5.0.0', 'py': '1.8.0', 'pluggy': '0.12.0'}, 'Plugins': {'html': '1.21.1', 'metadata': '1.8.0'}}
+
 rootdir: C:\Users\ABC\PycharmProjects\Reflektion\APITestAutomation
+
 plugins: html-1.21.1, metadata-1.8.0
+
 collected 6 items
 
 tests/test_api.py::test_get_request_1 PASSED                                                                                                                                      [ 16%]
