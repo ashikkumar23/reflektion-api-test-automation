@@ -72,14 +72,16 @@ def test_get_request_2():
 def test_get_response_3():
     """
     Test to verify status code returned is 404 by GET request
+    Test to log the complete request and response details for troubleshooting
     :return: none
     """
-    logging.getLogger().setLevel(logging.DEBUG)
+    logger = logging.getLogger("my_logger")
+    logger.setLevel(level=logging.DEBUG)
     response = api.get_request(invalid_test_url, headers)
-    logging.debug("Response status code is: {}".format(response.status_code))
-    logging.debug("Request type is: {}".format(response.request.method))
-    logging.debug("Request url is: {}".format(response.request.url))
-    logging.debug("Request body is: {}".format(response.request.body))
+    logger.debug("Response status code is: {}".format(response.status_code))
+    logger.debug("Request type is: {}".format(response.request.method))
+    logger.debug("Request url is: {}".format(response.request.url))
+    logger.debug("Request body is: {}".format(response.request.body))
     assert response.status_code == 404, "TEST FAIL - Status code is NOT 404, got: {}".format(response.status_code)
 
 
