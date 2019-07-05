@@ -10,8 +10,8 @@ Automated API's to verify response, schema, etc.,
 Above packages are mentioned as part of requirements.txt, run the command: pip install -r requirements.txt
 
 # Project contents:
-1. `api` directory contains `api.py` file which consists of api methods required for api testing
-2. `tests` directory contains `test_api.py` file which verifies api's response, schema, etc.,
+1. `api` directory contains `api.py`, `__init__.py` files which consists of api methods required for api testing
+2. `tests` directory contains `test_api.py` and `__init__.py` files which verifies api's response, schema, etc.,
 
 # Steps to execute the tests:
 1. Pull the code to your local repository
