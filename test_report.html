@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    var colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    var key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() {
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() {
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove("collapsed");
+    expandcollapse.classList.remove("expander");
+    expandcollapse.classList.add("collapser");
+}
+
+function hide_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add("collapsed");
+    expandcollapse.classList.remove("collapser");
+    expandcollapse.classList.add("expander");
+}
+
+function show_filters() {
+    var filter_items = document.getElementsByClassName('filter');
+    for (var i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    var resulttable = find('table#results-table');
+    var showhideall = document.createElement("p");
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        var collapsed = get_query_parameter('collapsed') || 'Passed';
+        var extras = elem.parentNode.nextElementSibling;
+        var expandcollapse = document.createElement("span");
+        if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add("collapsed");
+            expandcollapse.classList.add("expander");
+        } else {
+            expandcollapse.classList.add("collapser");
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener("click", function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains("collapsed")) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    })
+}
+
+function get_query_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () {
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    toggle_sort_states(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener("click",
+                              function(event) {
+                                  sort_column(elem);
+                              }, false)
+    });
+
+};
+
+function sort_table(clicked, key_func) {
+    var rows = find_all('.results-table-row');
+    var reversed = !clicked.classList.contains('asc');
+    var sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    var thead = document.getElementById("results-table-head");
+    document.getElementById('results-table').remove();
+    var parent = document.createElement("table");
+    parent.id = "results-table";
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName("BODY")[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    var sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+    var multiplier = reversed ? -1 : 1;
+
+    sort_array.sort(function(a, b) {
+        var key_a = a[0];
+        var key_b = b[0];
+        return multiplier * (key_a >= key_b ? 1 : -1);
+    });
+
+    return sort_array.map(function(item) {
+        var index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        var strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+                       'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        var icon = document.createElement("div");
+        icon.className = "sort-icon";
+        icon.textContent = "vvv";
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove("desc", "active");
+        elem.classList.add("asc", "inactive");
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+  return value.hidden == false;
+}
+
+function filter_table(elem) {
+    var outcome_att = "data-test-result";
+    var outcome = elem.getAttribute(outcome_att);
+    class_outcome = outcome + " results-table-row";
+    var outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(var i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    var rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    var all_rows_hidden = rows.length == 0 ? true : false;
+    var not_found_message = document.getElementById("not-found-message");
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>test_report.html</h1>
+    <p>Report generated on 05-Jul-2019 at 13:33:34 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v1.21.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>Packages</td>
+        <td>{&apos;py&apos;: &apos;1.8.0&apos;, &apos;pytest&apos;: &apos;4.6.4&apos;, &apos;pluggy&apos;: &apos;0.12.0&apos;}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-8.1-6.3.9600</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{u&apos;html&apos;: u&apos;1.21.1&apos;, u&apos;metadata&apos;: u&apos;1.8.0&apos;}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>2.7.16</td></tr></table>
+    <h2>Summary</h2>
+    <p>6 tests ran in 15.30 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">6 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th>Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_api.py::test_get_request_1</td>
+          <td class="col-duration">2.45</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">----------------------------- Captured stdout call -----------------------------<br/>[{u'body': u'quia et suscipit\nsuscipit recusandae consequuntur expedita et cum\nreprehenderit molestiae ut ut quas totam\nnostrum rerum est autem sunt rem eveniet architecto', u'userId': 1, u'id': 1, u'title': u'sunt aut facere repellat provident occaecati excepturi optio reprehenderit'}, {u'body': u'est rerum tempore vitae\nsequi sint nihil reprehenderit dolor beatae ea dolores neque\nfugiat blanditiis voluptate porro vel nihil molestiae ut reiciendis\nqui aperiam non debitis possimus qui neque nisi nulla', u'userId': 1, u'id': 2, u'title': u'qui est esse'}, {u'body': u'et iusto sed quo iure\nvoluptatem occaecati omnis eligendi aut ad\nvoluptatem doloribus vel accusantium quis pariatur\nmolestiae porro eius odio et labore et velit aut', u'userId': 1, u'id': 3, u'title': u'ea molestias quasi exercitationem repellat qui ipsa sit aut'}, {u'body': u'ullam et saepe reiciendis voluptatem adipisci\nsit amet autem assumenda provident rerum culpa\nquis hic commodi nesciunt rem tenetur doloremque ipsam iure\nquis sunt voluptatem rerum illo velit', u'userId': 1, u'id': 4, u'title': u'eum et est occaecati'}, {u'body': u'repudiandae veniam quaerat sunt sed\nalias aut fugiat sit autem sed est\nvoluptatem omnis possimus esse voluptatibus quis\nest aut tenetur dolor neque', u'userId': 1, u'id': 5, u'title': u'nesciunt quas odio'}, {u'body': u'ut aspernatur corporis harum nihil quis provident sequi\nmollitia nobis aliquid molestiae\nperspiciatis et ea nemo ab reprehenderit accusantium quas\nvoluptate dolores velit et doloremque molestiae', u'userId': 1, u'id': 6, u'title': u'dolorem eum magni eos aperiam quia'}, {u'body': u'dolore placeat quibusdam ea quo vitae\nmagni quis enim qui quis quo nemo aut saepe\nquidem repellat excepturi ut quia\nsunt ut sequi eos ea sed quas', u'userId': 1, u'id': 7, u'title': u'magnam facilis autem'}, {u'body': u'dignissimos aperiam dolorem qui eum\nfacilis quibusdam animi sint suscipit qui sint possimus cum\nquaerat magni maiores excepturi\nipsam ut commodi dolor voluptatum modi aut vitae', u'userId': 1, u'id': 8, u'title': u'dolorem dolore est ipsam'}, {u'body': u'consectetur animi nesciunt iure dolore\nenim quia ad\nveniam autem ut quam aut nobis\net est aut quod aut provident voluptas autem voluptas', u'userId': 1, u'id': 9, u'title': u'nesciunt iure omnis dolorem tempora et accusantium'}, {u'body': u'quo et expedita modi cum officia vel magni\ndoloribus qui repudiandae\nvero nisi sit\nquos veniam quod sed accusamus veritatis error', u'userId': 1, u'id': 10, u'title': u'optio molestias id quia eum'}, {u'body': u'delectus reiciendis molestiae occaecati non minima eveniet qui voluptatibus\naccusamus in eum beatae sit\nvel qui neque voluptates ut commodi qui incidunt\nut animi commodi', u'userId': 2, u'id': 11, u'title': u'et ea vero quia laudantium autem'}, {u'body': u'itaque id aut magnam\npraesentium quia et ea odit et ea voluptas et\nsapiente quia nihil amet occaecati quia id voluptatem\nincidunt ea est distinctio odio', u'userId': 2, u'id': 12, u'title': u'in quibusdam tempore odit est dolorem'}, {u'body': u'aut dicta possimus sint mollitia voluptas commodi quo doloremque\niste corrupti reiciendis voluptatem eius rerum\nsit cumque quod eligendi laborum minima\nperferendis recusandae assumenda consectetur porro architecto ipsum ipsam', u'userId': 2, u'id': 13, u'title': u'dolorum ut in voluptas mollitia et saepe quo animi'}, {u'body': u'fuga et accusamus dolorum perferendis illo voluptas\nnon doloremque neque facere\nad qui dolorum molestiae beatae\nsed aut voluptas totam sit illum', u'userId': 2, u'id': 14, u'title': u'voluptatem eligendi optio'}, {u'body': u'reprehenderit quos placeat\nvelit minima officia dolores impedit repudiandae molestiae nam\nvoluptas recusandae quis delectus\nofficiis harum fugiat vitae', u'userId': 2, u'id': 15, u'title': u'eveniet quod temporibus'}, {u'body': u'suscipit nam nisi quo aperiam aut\nasperiores eos fugit maiores voluptatibus quia\nvoluptatem quis ullam qui in alias quia est\nconsequatur magni mollitia accusamus ea nisi voluptate dicta', u'userId': 2, u'id': 16, u'title': u'sint suscipit perspiciatis velit dolorum rerum ipsa laboriosam odio'}, {u'body': u'eos voluptas et aut odit natus earum\naspernatur fuga molestiae ullam\ndeserunt ratione qui eos\nqui nihil ratione nemo velit ut aut id quo', u'userId': 2, u'id': 17, u'title': u'fugit voluptas sed molestias voluptatem provident'}, {u'body': u'eveniet quo quis\nlaborum totam consequatur non dolor\nut et est repudiandae\nest voluptatem vel debitis et magnam', u'userId': 2, u'id': 18, u'title': u'voluptate et itaque vero tempora molestiae'}, {u'body': u'illum quis cupiditate provident sit magnam\nea sed aut omnis\nveniam maiores ullam consequatur atque\nadipisci quo iste expedita sit quos voluptas', u'userId': 2, u'id': 19, u'title': u'adipisci placeat illum aut reiciendis qui'}, {u'body': u'qui consequuntur ducimus possimus quisquam amet similique\nsuscipit porro ipsam amet\neos veritatis officiis exercitationem vel fugit aut necessitatibus totam\nomnis rerum consequatur expedita quidem cumque explicabo', u'userId': 2, u'id': 20, u'title': u'doloribus ad provident suscipit at'}, {u'body': u'repellat aliquid praesentium dolorem quo\nsed totam minus non itaque\nnihil labore molestiae sunt dolor eveniet hic recusandae veniam\ntempora et tenetur expedita sunt', u'userId': 3, u'id': 21, u'title': u'asperiores ea ipsam voluptatibus modi minima quia sint'}, {u'body': u'eos qui et ipsum ipsam suscipit aut\nsed omnis non odio\nexpedita earum mollitia molestiae aut atque rem suscipit\nnam impedit esse', u'userId': 3, u'id': 22, u'title': u'dolor sint quo a velit explicabo quia nam'}, {u'body': u'veritatis unde neque eligendi\nquae quod architecto quo neque vitae\nest illo sit tempora doloremque fugit quod\net et vel beatae sequi ullam sed tenetur perspiciatis', u'userId': 3, u'id': 23, u'title': u'maxime id vitae nihil numquam'}, {u'body': u'enim et ex nulla\nomnis voluptas quia qui\nvoluptatem consequatur numquam aliquam sunt\ntotam recusandae id dignissimos aut sed asperiores deserunt', u'userId': 3, u'id': 24, u'title': u'autem hic labore sunt dolores incidunt'}, {u'body': u'ullam consequatur ut\nomnis quis sit vel consequuntur\nipsa eligendi ipsum molestiae et omnis error nostrum\nmolestiae illo tempore quia et distinctio', u'userId': 3, u'id': 25, u'title': u'rem alias distinctio quo quis'}, {u'body': u'similique esse doloribus nihil accusamus\nomnis dolorem fuga consequuntur reprehenderit fugit recusandae temporibus\nperspiciatis cum ut laudantium\nomnis aut molestiae vel vero', u'userId': 3, u'id': 26, u'title': u'est et quae odit qui non'}, {u'body': u'eum sed dolores ipsam sint possimus debitis occaecati\ndebitis qui qui et\nut placeat enim earum aut odit facilis\nconsequatur suscipit necessitatibus rerum sed inventore temporibus consequatur', u'userId': 3, u'id': 27, u'title': u'quasi id et eos tenetur aut quo autem'}, {u'body': u'non et quaerat ex quae ad maiores\nmaiores recusandae totam aut blanditiis mollitia quas illo\nut voluptatibus voluptatem\nsimilique nostrum eum', u'userId': 3, u'id': 28, u'title': u'delectus ullam et corporis nulla voluptas sequi'}, {u'body': u'odit magnam ut saepe sed non qui\ntempora atque nihil\naccusamus illum doloribus illo dolor\neligendi repudiandae odit magni similique sed cum maiores', u'userId': 3, u'id': 29, u'title': u'iusto eius quod necessitatibus culpa ea'}, {u'body': u'alias dolor cumque\nimpedit blanditiis non eveniet odio maxime\nblanditiis amet eius quis tempora quia autem rem\na provident perspiciatis quia', u'userId': 3, u'id': 30, u'title': u'a quo magni similique perferendis'}, {u'body': u'debitis eius sed quibusdam non quis consectetur vitae\nimpedit ut qui consequatur sed aut in\nquidem sit nostrum et maiores adipisci atque\nquaerat voluptatem adipisci repudiandae', u'userId': 4, u'id': 31, u'title': u'ullam ut quidem id aut vel consequuntur'}, {u'body': u'deserunt eos nobis asperiores et hic\nest debitis repellat molestiae optio\nnihil ratione ut eos beatae quibusdam distinctio maiores\nearum voluptates et aut adipisci ea maiores voluptas maxime', u'userId': 4, u'id': 32, u'title': u'doloremque illum aliquid sunt'}, {u'body': u'rerum ut et numquam laborum odit est sit\nid qui sint in\nquasi tenetur tempore aperiam et quaerat qui in\nrerum officiis sequi cumque quod', u'userId': 4, u'id': 33, u'title': u'qui explicabo molestiae dolorem'}, {u'body': u'ea velit perferendis earum ut voluptatem voluptate itaque iusto\ntotam pariatur in\nnemo voluptatem voluptatem autem magni tempora minima in\nest distinctio qui assumenda accusamus dignissimos officia nesciunt nobis', u'userId': 4, u'id': 34, u'title': u'magnam ut rerum iure'}, {u'body': u'nisi error delectus possimus ut eligendi vitae\nplaceat eos harum cupiditate facilis reprehenderit voluptatem beatae\nmodi ducimus quo illum voluptas eligendi\net nobis quia fugit', u'userId': 4, u'id': 35, u'title': u'id nihil consequatur molestias animi provident'}, {u'body': u'ad mollitia et omnis minus architecto odit\nvoluptas doloremque maxime aut non ipsa qui alias veniam\nblanditiis culpa aut quia nihil cumque facere et occaecati\nqui aspernatur quia eaque ut aperiam inventore', u'userId': 4, u'id': 36, u'title': u'fuga nam accusamus voluptas reiciendis itaque'}, {u'body': u'debitis et eaque non officia sed nesciunt pariatur vel\nvoluptatem iste vero et ea\nnumquam aut expedita ipsum nulla in\nvoluptates omnis consequatur aut enim officiis in quam qui', u'userId': 4, u'id': 37, u'title': u'provident vel ut sit ratione est'}, {u'body': u'animi esse sit aut sit nesciunt assumenda eum voluptas\nquia voluptatibus provident quia necessitatibus ea\nrerum repudiandae quia voluptatem delectus fugit aut id quia\nratione optio eos iusto veniam iure', u'userId': 4, u'id': 38, u'title': u'explicabo et eos deleniti nostrum ab id repellendus'}, {u'body': u'corporis rerum ducimus vel eum accusantium\nmaxime aspernatur a porro possimus iste omnis\nest in deleniti asperiores fuga aut\nvoluptas sapiente vel dolore minus voluptatem incidunt ex', u'userId': 4, u'id': 39, u'title': u'eos dolorem iste accusantium est eaque quam'}, {u'body': u'ut voluptatum aliquid illo tenetur nemo sequi quo facilis\nipsum rem optio mollitia quas\nvoluptatem eum voluptas qui\nunde omnis voluptatem iure quasi maxime voluptas nam', u'userId': 4, u'id': 40, u'title': u'enim quo cumque'}, {u'body': u'molestias id nostrum\nexcepturi molestiae dolore omnis repellendus quaerat saepe\nconsectetur iste quaerat tenetur asperiores accusamus ex ut\nnam quidem est ducimus sunt debitis saepe', u'userId': 5, u'id': 41, u'title': u'non est facere'}, {u'body': u'odio fugit voluptatum ducimus earum autem est incidunt voluptatem\nodit reiciendis aliquam sunt sequi nulla dolorem\nnon facere repellendus voluptates quia\nratione harum vitae ut', u'userId': 5, u'id': 42, u'title': u'commodi ullam sint et excepturi error explicabo praesentium voluptas'}, {u'body': u'similique fugit est\nillum et dolorum harum et voluptate eaque quidem\nexercitationem quos nam commodi possimus cum odio nihil nulla\ndolorum exercitationem magnam ex et a et distinctio debitis', u'userId': 5, u'id': 43, u'title': u'eligendi iste nostrum consequuntur adipisci praesentium sit beatae perferendis'}, {u'body': u'temporibus est consectetur dolore\net libero debitis vel velit laboriosam quia\nipsum quibusdam qui itaque fuga rem aut\nea et iure quam sed maxime ut distinctio quae', u'userId': 5, u'id': 44, u'title': u'optio dolor molestias sit'}, {u'body': u'est natus reiciendis nihil possimus aut provident\nex et dolor\nrepellat pariatur est\nnobis rerum repellendus dolorem autem', u'userId': 5, u'id': 45, u'title': u'ut numquam possimus omnis eius suscipit laudantium iure'}, {u'body': u'voluptatem quisquam iste\nvoluptatibus natus officiis facilis dolorem\nquis quas ipsam\nvel et voluptatum in aliquid', u'userId': 5, u'id': 46, u'title': u'aut quo modi neque nostrum ducimus'}, {u'body': u'voluptatem assumenda ut qui ut cupiditate aut impedit veniam\noccaecati nemo illum voluptatem laudantium\nmolestiae beatae rerum ea iure soluta nostrum\neligendi et voluptate', u'userId': 5, u'id': 47, u'title': u'quibusdam cumque rem aut deserunt'}, {u'body': u'voluptates quo voluptatem facilis iure occaecati\nvel assumenda rerum officia et\nillum perspiciatis ab deleniti\nlaudantium repellat ad ut et autem reprehenderit', u'userId': 5, u'id': 48, u'title': u'ut voluptatem illum ea doloribus itaque eos'}, {u'body': u'inventore ab sint\nnatus fugit id nulla sequi architecto nihil quaerat\neos tenetur in in eum veritatis non\nquibusdam officiis aspernatur cumque aut commodi aut', u'userId': 5, u'id': 49, u'title': u'laborum non sunt aut ut assumenda perspiciatis voluptas'}, {u'body': u'error suscipit maxime adipisci consequuntur recusandae\nvoluptas eligendi et est et voluptates\nquia distinctio ab amet quaerat molestiae et vitae\nadipisci impedit sequi nesciunt quis consectetur', u'userId': 5, u'id': 50, u'title': u'repellendus qui recusandae incidunt voluptates tenetur qui omnis exercitationem'}, {u'body': u'sunt dolores aut doloribus\ndolore doloribus voluptates tempora et\ndoloremque et quo\ncum asperiores sit consectetur dolorem', u'userId': 6, u'id': 51, u'title': u'soluta aliquam aperiam consequatur illo quis voluptas'}, {u'body': u'iusto est quibusdam fuga quas quaerat molestias\na enim ut sit accusamus enim\ntemporibus iusto accusantium provident architecto\nsoluta esse reprehenderit qui laborum', u'userId': 6, u'id': 52, u'title': u'qui enim et consequuntur quia animi quis voluptate quibusdam'}, {u'body': u'minima harum praesentium eum rerum illo dolore\nquasi exercitationem rerum nam\nporro quis neque quo\nconsequatur minus dolor quidem veritatis sunt non explicabo similique', u'userId': 6, u'id': 53, u'title': u'ut quo aut ducimus alias'}, {u'body': u'totam corporis dignissimos\nvitae dolorem ut occaecati accusamus\nex velit deserunt\net exercitationem vero incidunt corrupti mollitia', u'userId': 6, u'id': 54, u'title': u'sit asperiores ipsam eveniet odio non quia'}, {u'body': u'debitis excepturi ea perferendis harum libero optio\neos accusamus cum fuga ut sapiente repudiandae\net ut incidunt omnis molestiae\nnihil ut eum odit', u'userId': 6, u'id': 55, u'title': u'sit vel voluptatem et non libero'}, {u'body': u'aut est omnis dolores\nneque rerum quod ea rerum velit pariatur beatae excepturi\net provident voluptas corrupti\ncorporis harum reprehenderit dolores eligendi', u'userId': 6, u'id': 56, u'title': u'qui et at rerum necessitatibus'}, {u'body': u'at pariatur consequuntur earum quidem\nquo est laudantium soluta voluptatem\nqui ullam et est\net cum voluptas voluptatum repellat est', u'userId': 6, u'id': 57, u'title': u'sed ab est est'}, {u'body': u'veniam voluptatum quae adipisci id\net id quia eos ad et dolorem\naliquam quo nisi sunt eos impedit error\nad similique veniam', u'userId': 6, u'id': 58, u'title': u'voluptatum itaque dolores nisi et quasi'}, {u'body': u'perspiciatis et quam ea autem temporibus non voluptatibus qui\nbeatae a earum officia nesciunt dolores suscipit voluptas et\nanimi doloribus cum rerum quas et magni\net hic ut ut commodi expedita sunt', u'userId': 6, u'id': 59, u'title': u'qui commodi dolor at maiores et quis id accusantium'}, {u'body': u'asperiores sunt ab assumenda cumque modi velit\nqui esse omnis\nvoluptate et fuga perferendis voluptas\nillo ratione amet aut et omnis', u'userId': 6, u'id': 60, u'title': u'consequatur placeat omnis quisquam quia reprehenderit fugit veritatis facere'}, {u'body': u'ab nemo optio odio\ndelectus tenetur corporis similique nobis repellendus rerum omnis facilis\nvero blanditiis debitis in nesciunt doloribus dicta dolores\nmagnam minus velit', u'userId': 7, u'id': 61, u'title': u'voluptatem doloribus consectetur est ut ducimus'}, {u'body': u'enim aspernatur illo distinctio quae praesentium\nbeatae alias amet delectus qui voluptate distinctio\nodit sint accusantium autem omnis\nquo molestiae omnis ea eveniet optio', u'userId': 7, u'id': 62, u'title': u'beatae enim quia vel'}, {u'body': u'enim adipisci aspernatur nemo\nnumquam omnis facere dolorem dolor ex quis temporibus incidunt\nab delectus culpa quo reprehenderit blanditiis asperiores\naccusantium ut quam in voluptatibus voluptas ipsam dicta', u'userId': 7, u'id': 63, u'title': u'voluptas blanditiis repellendus animi ducimus error sapiente et suscipit'}, {u'body': u'id velit blanditiis\neum ea voluptatem\nmolestiae sint occaecati est eos perspiciatis\nincidunt a error provident eaque aut aut qui', u'userId': 7, u'id': 64, u'title': u'et fugit quas eum in in aperiam quod'}, {u'body': u'voluptatibus ex esse\nsint explicabo est aliquid cumque adipisci fuga repellat labore\nmolestiae corrupti ex saepe at asperiores et perferendis\nnatus id esse incidunt pariatur', u'userId': 7, u'id': 65, u'title': u'consequatur id enim sunt et et'}, {u'body': u'officia veritatis tenetur vero qui itaque\nsint non ratione\nsed et ut asperiores iusto eos molestiae nostrum\nveritatis quibusdam et nemo iusto saepe', u'userId': 7, u'id': 66, u'title': u'repudiandae ea animi iusto'}, {u'body': u'reprehenderit id nostrum\nvoluptas doloremque pariatur sint et accusantium quia quod aspernatur\net fugiat amet\nnon sapiente et consequatur necessitatibus molestiae', u'userId': 7, u'id': 67, u'title': u'aliquid eos sed fuga est maxime repellendus'}, {u'body': u'magnam molestiae perferendis quisquam\nqui cum reiciendis\nquaerat animi amet hic inventore\nea quia deleniti quidem saepe porro velit', u'userId': 7, u'id': 68, u'title': u'odio quis facere architecto reiciendis optio'}, {u'body': u'officiis error culpa consequatur modi asperiores et\ndolorum assumenda voluptas et vel qui aut vel rerum\nvoluptatum quisquam perspiciatis quia rerum consequatur totam quas\nsequi commodi repudiandae asperiores et saepe a', u'userId': 7, u'id': 69, u'title': u'fugiat quod pariatur odit minima'}, {u'body': u'sunt repellendus quae\nest asperiores aut deleniti esse accusamus repellendus quia aut\nquia dolorem unde\neum tempora esse dolore', u'userId': 7, u'id': 70, u'title': u'voluptatem laborum magni'}, {u'body': u'occaecati a doloribus\niste saepe consectetur placeat eum voluptate dolorem et\nqui quo quia voluptas\nrerum ut id enim velit est perferendis', u'userId': 8, u'id': 71, u'title': u'et iusto veniam et illum aut fuga'}, {u'body': u'quam occaecati qui deleniti consectetur\nconsequatur aut facere quas exercitationem aliquam hic voluptas\nneque id sunt ut aut accusamus\nsunt consectetur expedita inventore velit', u'userId': 8, u'id': 72, u'title': u'sint hic doloribus consequatur eos non id'}, {u'body': u'voluptatem cumque tenetur consequatur expedita ipsum nemo quia explicabo\naut eum minima consequatur\ntempore cumque quae est et\net in consequuntur voluptatem voluptates aut', u'userId': 8, u'id': 73, u'title': u'consequuntur deleniti eos quia temporibus ab aliquid at'}, {u'body': u'odit qui et et necessitatibus sint veniam\nmollitia amet doloremque molestiae commodi similique magnam et quam\nblanditiis est itaque\nquo et tenetur ratione occaecati molestiae tempora', u'userId': 8, u'id': 74, u'title': u'enim unde ratione doloribus quas enim ut sit sapiente'}, {u'body': u'commodi non non omnis et voluptas sit\nautem aut nobis magnam et sapiente voluptatem\net laborum repellat qui delectus facilis temporibus\nrerum amet et nemo voluptate expedita adipisci error dolorem', u'userId': 8, u'id': 75, u'title': u'dignissimos eum dolor ut enim et delectus in'}, {u'body': u'ut animi facere\ntotam iusto tempore\nmolestiae eum aut et dolorem aperiam\nquaerat recusandae totam odio', u'userId': 8, u'id': 76, u'title': u'doloremque officiis ad et non perferendis'}, {u'body': u'modi ut in nulla repudiandae dolorum nostrum eos\naut consequatur omnis\nut incidunt est omnis iste et quam\nvoluptates sapiente aliquam asperiores nobis amet corrupti repudiandae provident', u'userId': 8, u'id': 77, u'title': u'necessitatibus quasi exercitationem odio'}, {u'body': u'nobis facilis odit tempore cupiditate quia\nassumenda doloribus rerum qui ea\nillum et qui totam\naut veniam repellendus', u'userId': 8, u'id': 78, u'title': u'quam voluptatibus rerum veritatis'}, {u'body': u'libero accusantium et et facere incidunt sit dolorem\nnon excepturi qui quia sed laudantium\nquisquam molestiae ducimus est\nofficiis esse molestiae iste et quos', u'userId': 8, u'id': 79, u'title': u'pariatur consequatur quia magnam autem omnis non amet'}, {u'body': u'ex quod dolorem ea eum iure qui provident amet\nquia qui facere excepturi et repudiandae\nasperiores molestias provident\nminus incidunt vero fugit rerum sint sunt excepturi provident', u'userId': 8, u'id': 80, u'title': u'labore in ex et explicabo corporis aut quas'}, {u'body': u'facere qui nesciunt est voluptatum voluptatem nisi\nsequi eligendi necessitatibus ea at rerum itaque\nharum non ratione velit laboriosam quis consequuntur\nex officiis minima doloremque voluptas ut aut', u'userId': 9, u'id': 81, u'title': u'tempora rem veritatis voluptas quo dolores vero'}, {u'body': u'ut libero sit aut totam inventore sunt\nporro sint qui sunt molestiae\nconsequatur cupiditate qui iste ducimus adipisci\ndolor enim assumenda soluta laboriosam amet iste delectus hic', u'userId': 9, u'id': 82, u'title': u'laudantium voluptate suscipit sunt enim enim'}, {u'body': u'est molestiae facilis quis tempora numquam nihil qui\nvoluptate sapiente consequatur est qui\nnecessitatibus autem aut ipsa aperiam modi dolore numquam\nreprehenderit eius rem quibusdam', u'userId': 9, u'id': 83, u'title': u'odit et voluptates doloribus alias odio et'}, {u'body': u'sint molestiae magni a et quos\neaque et quasi\nut rerum debitis similique veniam\nrecusandae dignissimos dolor incidunt consequatur odio', u'userId': 9, u'id': 84, u'title': u'optio ipsam molestias necessitatibus occaecati facilis veritatis dolores aut'}, {u'body': u'similique sed nisi voluptas iusto omnis\nmollitia et quo\nassumenda suscipit officia magnam sint sed tempora\nenim provident pariatur praesentium atque animi amet ratione', u'userId': 9, u'id': 85, u'title': u'dolore veritatis porro provident adipisci blanditiis et sunt'}, {u'body': u'quasi excepturi consequatur iste autem temporibus sed molestiae beatae\net quaerat et esse ut\nvoluptatem occaecati et vel explicabo autem\nasperiores pariatur deserunt optio', u'userId': 9, u'id': 86, u'title': u'placeat quia et porro iste'}, {u'body': u'eos et molestiae\nnesciunt ut a\ndolores perspiciatis repellendus repellat aliquid\nmagnam sint rem ipsum est', u'userId': 9, u'id': 87, u'title': u'nostrum quis quasi placeat'}, {u'body': u'consequatur omnis est praesentium\nducimus non iste\nneque hic deserunt\nvoluptatibus veniam cum et rerum sed', u'userId': 9, u'id': 88, u'title': u'sapiente omnis fugit eos'}, {u'body': u'repellat aut aperiam totam temporibus autem et\narchitecto magnam ut\nconsequatur qui cupiditate rerum quia soluta dignissimos nihil iure\ntempore quas est', u'userId': 9, u'id': 89, u'title': u'sint soluta et vel magnam aut ut sed qui'}, {u'body': u'minus omnis soluta quia\nqui sed adipisci voluptates illum ipsam voluptatem\neligendi officia ut in\neos soluta similique molestias praesentium blanditiis', u'userId': 9, u'id': 90, u'title': u'ad iusto omnis odit dolor voluptatibus'}, {u'body': u'libero voluptate eveniet aperiam sed\nsunt placeat suscipit molestias\nsimilique fugit nam natus\nexpedita consequatur consequatur dolores quia eos et placeat', u'userId': 10, u'id': 91, u'title': u'aut amet sed'}, {u'body': u'aut et excepturi dicta laudantium sint rerum nihil\nlaudantium et at\na neque minima officia et similique libero et\ncommodi voluptate qui', u'userId': 10, u'id': 92, u'title': u'ratione ex tenetur perferendis'}, {u'body': u'dolorem quibusdam ducimus consequuntur dicta aut quo laboriosam\nvoluptatem quis enim recusandae ut sed sunt\nnostrum est odit totam\nsit error sed sunt eveniet provident qui nulla', u'userId': 10, u'id': 93, u'title': u'beatae soluta recusandae'}, {u'body': u'aspernatur expedita soluta quo ab ut similique\nexpedita dolores amet\nsed temporibus distinctio magnam saepe deleniti\nomnis facilis nam ipsum natus sint similique omnis', u'userId': 10, u'id': 94, u'title': u'qui qui voluptates illo iste minima'}, {u'body': u'earum voluptatem facere provident blanditiis velit laboriosam\npariatur accusamus odio saepe\ncumque dolor qui a dicta ab doloribus consequatur omnis\ncorporis cupiditate eaque assumenda ad nesciunt', u'userId': 10, u'id': 95, u'title': u'id minus libero illum nam ad officiis'}, {u'body': u'in non odio excepturi sint eum\nlabore voluptates vitae quia qui et\ninventore itaque rerum\nveniam non exercitationem delectus aut', u'userId': 10, u'id': 96, u'title': u'quaerat velit veniam amet cupiditate aut numquam ut sequi'}, {u'body': u'eum non blanditiis soluta porro quibusdam voluptas\nvel voluptatem qui placeat dolores qui velit aut\nvel inventore aut cumque culpa explicabo aliquid at\nperspiciatis est et voluptatem dignissimos dolor itaque sit nam', u'userId': 10, u'id': 97, u'title': u'quas fugiat ut perspiciatis vero provident'}, {u'body': u'doloremque ex facilis sit sint culpa\nsoluta assumenda eligendi non ut eius\nsequi ducimus vel quasi\nveritatis est dolores', u'userId': 10, u'id': 98, u'title': u'laboriosam dolor voluptates'}, {u'body': u'quo deleniti praesentium dicta non quod\naut est molestias\nmolestias et officia quis nihil\nitaque dolorem quia', u'userId': 10, u'id': 99, u'title': u'temporibus sit alias delectus eligendi possimus magni'}, {u'body': u'cupiditate quo est a modi nesciunt soluta\nipsa voluptas error itaque dicta in\nautem qui minus magnam et distinctio eum\naccusamus ratione error aut', u'userId': 10, u'id': 100, u'title': u'at nam consequatur ea labore ea harum'}]
+</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_api.py::test_get_request_2</td>
+          <td class="col-duration">1.19</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">----------------------------- Captured stdout call -----------------------------<br/>[{u'body': u'quia et suscipit\nsuscipit recusandae consequuntur expedita et cum\nreprehenderit molestiae ut ut quas totam\nnostrum rerum est autem sunt rem eveniet architecto', u'userId': 1, u'id': 1, u'title': u'sunt aut facere repellat provident occaecati excepturi optio reprehenderit'}]
+</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_api.py::test_get_response_3</td>
+          <td class="col-duration">1.17</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">------------------------------ Captured log call -------------------------------<br/>[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:815 Starting new HTTPS connection (1): jsonplaceholder.typicode.com:443
+[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:396 https://jsonplaceholder.typicode.com:443 "GET /invalidposts HTTP/1.1" 404 2
+[35mDEBUG   [0m root:test_api.py:79 Response status code is: 404
+[35mDEBUG   [0m root:test_api.py:80 Request type is: GET
+[35mDEBUG   [0m root:test_api.py:81 Request url is: https://jsonplaceholder.typicode.com/invalidposts
+[35mDEBUG   [0m root:test_api.py:82 Request body is: None</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_api.py::test_post_request</td>
+          <td class="col-duration">1.69</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">----------------------------- Captured stdout call -----------------------------<br/>{u'body': u'bar', u'userId': 1, u'id': 101, u'title': u'foo'}
+------------------------------ Captured log call -------------------------------<br/>[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:815 Starting new HTTPS connection (1): jsonplaceholder.typicode.com:443
+[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:396 https://jsonplaceholder.typicode.com:443 "POST /posts HTTP/1.1" 201 65</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_api.py::test_put_request</td>
+          <td class="col-duration">2.50</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">----------------------------- Captured stdout call -----------------------------<br/>{u'body': u'xyz', u'userId': 1, u'id': 1, u'title': u'abc'}
+------------------------------ Captured log call -------------------------------<br/>[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:815 Starting new HTTPS connection (1): jsonplaceholder.typicode.com:443
+[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:396 https://jsonplaceholder.typicode.com:443 "GET /posts/1 HTTP/1.1" 200 None
+[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:815 Starting new HTTPS connection (1): jsonplaceholder.typicode.com:443
+[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:396 https://jsonplaceholder.typicode.com:443 "PUT /posts/1 HTTP/1.1" 200 None</div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">tests/test_api.py::test_delete_request</td>
+          <td class="col-duration">1.66</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">------------------------------ Captured log call -------------------------------<br/>[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:815 Starting new HTTPS connection (1): jsonplaceholder.typicode.com:443
+[35mDEBUG   [0m urllib3.connectionpool:connectionpool.py:396 https://jsonplaceholder.typicode.com:443 "DELETE /posts/1 HTTP/1.1" 200 2</div></td></tr></tbody></table></body></html>
